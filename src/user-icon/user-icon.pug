@@ -1,0 +1,21 @@
+dom-module#user-icon
+  template
+    style(is="custom-style")
+      :stylus
+        :host
+          display: block
+        img
+          width: 100%
+          height: 100%
+    img(src="[[user.photoUrl]]")
+  script
+    :babel
+      Polymer({
+        is: 'user-icon',
+        properties: {
+          user: {
+            type: Object
+          }
+        },
+      })
+

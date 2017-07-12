@@ -1,0 +1,181 @@
+link(rel="import" href="../bower_components/polymer/polymer.html")
+link(rel="import" href="../bower_components/polymer/lib/elements/custom-style.html")
+link(rel="import" href="../bower_components/polymerfire/firebase-app.html")
+link(rel="import" href="../bower_components/polymerfire/firebase-auth.html")
+link(rel="import" href="../bower_components/polymerfire/firebase-query.html")
+link(rel="import" href="../bower_components/paper-input/paper-textarea.html")
+link(rel="import" href="../bower_components/iron-icons/iron-icons.html")
+link(rel="import" href="../bower_components/paper-icon-button/paper-icon-button.html")
+link(rel="import" href="../bower_components/iron-flex-layout/iron-flex-layout-classes.html")
+link(rel="import" href="../bower_components/iron-list/iron-list.html")
+link(rel="import" href="../fire-chat-post/fire-chat-post.html")
+link(rel="import" href="../user-icon/user-icon.html")
+script(src="../bower_components/moment/min/moment.min.js")
+
+dom-module#fire-chat
+  template
+    style(is="custom-style" include="iron-flex iron-flex-factors iron-positioning iron-flex-alignment")
+      :stylus
+        .posts
+          overflow: scroll
+          fire-chat-post
+            &:not(:last-child)
+              border-bottom: 1px solid #eee
+        .participants
+          padding: 5px 8px
+          height: 25px
+          user-icon
+            width: 25px
+            height: 25px
+            border-radius: 100%
+            overflow: hidden
+    firebase-app(auth-domain="[[authDomain]]" database-url="[[database]]" api-key="[[apiKey]]")
+    firebase-auth#auth(user="{{_user}}")
+    firebase-query#firstPost(path="/[[roomsPath]]/[[roomId]]/posts" data="{{postsFromFirst}}" limit-to-first="1")
+    firebase-query#postsQuery(path="/[[roomsPath]]/[[roomId]]/posts" data="{{posts}}" limit-to-last="[[postsLimit]]")
+    firebase-query#participantsQuery(path="/[[roomsPath]]/[[roomId]]/participants" data="{{participants}}")
+    template(is="dom-if" if="[[_user]]")
+      iron-list.posts(style$="height: [[postsHeight]]" on-scroll="updatePostsLimit" items="[[posts]]")
+        template
+          fire-chat-post(post="[[item]]" poster="[[user(item.createdBy)]]")
+      .participants.layout.horizontal
+        template(is="dom-repeat" items="[[participantsToUsers(participants, users, participants.length)]]")
+          user-icon(user="[[item]]")
+      .layout.horizontal
+        .flex
+          paper-textarea(value="{{postBody}}" label="" on-keydown="onKeydown" on-focus="participate" on-blur="unparticipate" no-label-float="true")
+        .button
+          paper-icon-button(raised icon="send" on-click="submit" disabled="[[!postBody]]")
+  script
+    :babel
+      // NOTE: class構文はBabelのコンパイルが不完全やからなし
+      Polymer({
+        is: 'fire-chat',
+        properties: {
+          authDomain: {
+            type: String
+          },
+          database: {
+            type: String
+          },
+          apiKey: {
+            type: String
+          },
+          roomsPath: {
+            type: String,
+            value: 'rooms'
+          },
+          roomId: {
+            type: String
+          },
+          myId: {
+            type: String
+          },
+          users: {
+            type: Array
+          },
+          postBody: {
+            type: String,
+            value: ''
+          },
+          postsPer: {
+            type: Number,
+            readOnly: true,
+            value: 15,
+          },
+          postsLimit: {
+            type: Number,
+          },
+          postsHeight: {
+            type: String,
+            value: '500px'
+          },
+        },
+        observers: [
+          "setFirstPost(postsFromFirst, postsFromFirst.length)",
+          "scrollToLast(posts.length)"
+        ],
+        setFirstPost([firstPost]) {
+          if (!firstPost) return
+          this.set('firstPost', firstPost)
+        },
+        attached() {
+          this.prepareScroll()
+          this.setPostsLimit(this.postsPer)
+          this.signIn()
+        },
+        prepareScroll() {
+          this.$.postsQuery.ref.once('value', () => {
+            this.async(this.scrollNicely.bind(this), 100)
+          })
+        },
+        scrollNicely() {
+          this.$$('.posts').scrollToIndex(this.postsPer - 1)
+        },
+        setPostsLimit(num) {
+          this.set('postsLimit', num)
+        },
+        signIn() {
+          const { $: { auth } } = this
+          if (auth.signedIn) return
+          auth.signInAnonymously()
+        },
+        submit() {
+          const { postBody } = this
+          if (!postBody) return
+          const query = this.$$('#postsQuery')
+          query.ref.push({ body: this.postBody, createdBy: this.myId, createdAt: firebase.database.ServerValue.TIMESTAMP })
+          this.set('postBody', '')
+        },
+        onKeydown(event) {
+          const { shiftKey, keyCode } = event
+          if (!shiftKey && keyCode == 13) {
+            event.preventDefault()
+            this.submit()
+          }
+        },
+        user(id) {
+          return this.users[id]
+        },
+        participate() {
+          const { participants, myId } = this
+          const query = this.$$('#participantsQuery')
+          const hasParticipated = participants.some(p => {
+            return p.userId === myId
+          })
+          if (hasParticipated) return
+          query.ref.push({ userId: this.myId })
+        },
+        unparticipate() {
+          const { participants, myId } = this
+          const query = this.$$('#participantsQuery')
+          participants.filter(p => {
+            return p.userId === myId
+          }).forEach(p => {
+            query.ref.child(p.$key).remove()
+          })
+        },
+        participantsToUsers(participants, users) {
+          if (!(participants && users)) return []
+          return participants.map(p => users[p.userId])
+        },
+        updatePostsLimit({ target }) {
+          if (target.scrollTop > 0) return
+          const { posts, firstPost } = this
+          if (!(firstPost && posts[0])) return
+          if (posts[0].$key === firstPost.$key) return
+          this.debounce('updatePostsLimit', ()=> {
+            this.setPostsLimit(this.postsLimit + this.postsPer)
+            this.prepareScroll()
+          }, 500)
+        },
+        scrollToLast() {
+          this.debounce('scrollToLast', () => {
+            const postsElm = this.$$('.posts')
+            if (!postsElm) return
+            if (this.postsHeight + postsElm.scrollTop + 100 > postsElm.scrollHeight) {
+              postsElm.scrollTop = 100000
+            }
+          }, 100)
+        }
+      })

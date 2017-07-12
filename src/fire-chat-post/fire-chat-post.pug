@@ -1,0 +1,68 @@
+dom-module#fire-chat-post
+  template
+    style(is="custom-style" include="iron-flex iron-flex-factors iron-positioning iron-flex-alignment")
+      :stylus
+        :host
+          display: block
+        .post
+          padding: 8px 12px
+          .left-box
+            padding: 0px 5px
+            user-icon
+              width: 40px
+              height: 40px
+              border-radius: 100%
+              overflow: hidden
+          .main
+            padding: 0px 5px
+            .info
+              font-size: 70%
+              color: #bbb
+              .posted-at
+                margin-left: 13px
+    .post.layout.horizontal.center
+      .left-box
+        user-icon(user="[[poster]]")
+      .main
+        .info.layout.horizontal
+          .name [[poster.name]]
+          .posted-at [[postedAt]]
+        .body [[post.body]]
+  script
+    :babel
+      Polymer({
+        is: 'fire-chat-post',
+        properties: {
+          post: {
+            type: Object
+          },
+          poster: {
+            type: Object
+          }
+        },
+        observers: [
+          'setPostedAt(post.createdAt)'
+        ],
+        attached() {
+          this.startInterval()
+        },
+        startInterval() {
+          const f = () => {
+            const asyncId = this.async(() => {
+              this.setPostedAt(this.post.createdAt)
+              f()
+            }, 30000)
+            this.set('asyncId', asyncId)
+          }
+          f()
+        },
+        endInterval() {
+          this.cancelAsync(this.asyncId)
+        },
+        detached() {
+          this.endInterval()
+        },
+        setPostedAt(time) {
+          this.set('postedAt', moment(time).fromNow())
+        },
+      })
