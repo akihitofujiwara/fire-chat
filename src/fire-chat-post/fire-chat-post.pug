@@ -20,6 +20,9 @@ dom-module#fire-chat-post
               color: #bbb
               .posted-at
                 margin-left: 13px
+        .markdown-html
+          p
+            margin: 0
     .post.layout.horizontal.center
       .left-box
         user-icon(user="[[poster]]")
@@ -27,7 +30,9 @@ dom-module#fire-chat-post
         .info.layout.horizontal
           .name [[poster.name]]
           .posted-at [[postedAt]]
-        .body [[post.body]]
+        .body
+          marked-element(markdown="[[post.body]]" breaks="true" smartypants="true")
+            div.markdown-html(slot="markdown-html")
   script
     :babel
       Polymer({
