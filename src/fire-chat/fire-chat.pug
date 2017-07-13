@@ -174,7 +174,7 @@ dom-module#fire-chat
           this.debounce('scrollToLast', () => {
             const postsElm = this.$$('.posts')
             if (!postsElm) return
-            if (this.postsHeight + postsElm.scrollTop + 100 > postsElm.scrollHeight) {
+            if (postsElm.offsetHeight + postsElm.scrollTop + 100 > postsElm.scrollHeight) {
               postsElm.scrollTop = 100000
             }
           }, 100)
