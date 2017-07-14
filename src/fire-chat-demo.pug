@@ -1,0 +1,17 @@
+html
+  head
+    link(rel="import" href="./fire-chat/fire-chat.html")
+  body
+    -
+      var mah = { id: 1, name: 'mah', photoUrl: 'https://remotty-data.s3.amazonaws.com/uploads/user/image/9/thumb_mah2016_up.png' }
+      var jit = { id: 2, name: 'jit', photoUrl: 'https://remotty-data.s3.amazonaws.com/uploads/user/image/12/thumb_jit_20140623.jpg' }
+    style
+      :stylus
+        .chats
+          display: flex
+          justify-content: space-around
+          > *
+            width: 400px
+    .chats
+      fire-chat(auth-domain="fire-chat-demo-22527.firebaseapp.com" database="https://fire-chat-demo-22527.firebaseio.com/" api-key="AIzaSyA2WittWI-aUCpitC7wcVdbXchy-LjSTY0" room-id="3" user=JSON.stringify(mah))
+      fire-chat(auth-domain="fire-chat-demo-22527.firebaseapp.com" database="https://fire-chat-demo-22527.firebaseio.com/" api-key="AIzaSyA2WittWI-aUCpitC7wcVdbXchy-LjSTY0" room-id="3" user=JSON.stringify(jit))

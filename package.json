@@ -21,8 +21,7 @@
   },
   "scripts": {
     "dev": "gulp dev",
-    "build": "gulp build && yarn run vulcanize-index && yarn run vulcanize-fire-chat",
-    "vulcanize-index": "$(yarn bin)/vulcanize dist/index.html --out-html dist/index.html --inline-scripts",
-    "vulcanize-fire-chat": "$(yarn bin)/vulcanize dist/fire-chat/fire-chat.html --out-html ./fire-chat.html --inline-scripts"
+    "build": "gulp build && yarn run vulcanize",
+    "vulcanize": "$(yarn bin)/vulcanize dist/fire-chat/fire-chat.html --out-html dist/fire-chat/fire-chat.html --inline-scripts"
   }
 }

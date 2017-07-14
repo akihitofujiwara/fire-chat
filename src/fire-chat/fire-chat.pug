@@ -31,14 +31,15 @@ dom-module#fire-chat
             border-radius: 100%
             overflow: hidden
     firebase-app(auth-domain="[[authDomain]]" database-url="[[database]]" api-key="[[apiKey]]")
-    firebase-auth#auth(user="{{_user}}")
+    firebase-auth#auth(user="{{authUser}}")
     firebase-query#firstPost(path="/[[roomsPath]]/[[roomId]]/posts" data="{{postsFromFirst}}" limit-to-first="1")
-    firebase-query#postsQuery(path="/[[roomsPath]]/[[roomId]]/posts" data="{{posts}}" limit-to-last="[[postsLimit]]")
-    firebase-query#participantsQuery(path="/[[roomsPath]]/[[roomId]]/participants" data="{{participants}}")
-    template(is="dom-if" if="[[_user]]")
+    firebase-query#fbUsers(path="/users" data="{{users}}")
+    firebase-query#fbPosts(path="/[[roomsPath]]/[[roomId]]/posts" data="{{posts}}" limit-to-last="[[postsLimit]]")
+    firebase-query#fbParticipations(path="/[[roomsPath]]/[[roomId]]/participants" data="{{participants}}")
+    template(is="dom-if" if="[[authUser]]")
       iron-list.posts(style$="height: [[postsHeight]]" on-scroll="updatePostsLimit" items="[[posts]]")
         template
-          fire-chat-post(post="[[item]]" poster="[[user(item.createdBy)]]")
+          fire-chat-post(post="[[item]]" poster="[[userById(item.createdBy)]]")
       .participants.layout.horizontal
         template(is="dom-repeat" items="[[participantsToUsers(participants, users, participants.length)]]")
           user-icon(user="[[item]]")
@@ -69,11 +70,8 @@ dom-module#fire-chat
           roomId: {
             type: String
           },
-          myId: {
-            type: String
-          },
-          users: {
-            type: Array
+          user: {
+            type: Object
           },
           postBody: {
             type: String,
@@ -93,9 +91,15 @@ dom-module#fire-chat
           },
         },
         observers: [
+          "updateOrCreateUser(authUser, user)",
           "setFirstPost(postsFromFirst, postsFromFirst.length)",
           "scrollToLast(posts.length)"
         ],
+        updateOrCreateUser(authUser, user) {
+          if (!(authUser && user)) return
+          const { $: { fbUsers } } = this
+          fbUsers.ref.child(user.id).set(user)
+        },
         setFirstPost([firstPost]) {
           if (!firstPost) return
           this.set('firstPost', firstPost)
@@ -104,9 +108,10 @@ dom-module#fire-chat
           this.prepareScroll()
           this.setPostsLimit(this.postsPer)
           this.signIn()
+          this.updateOrCreateUser()
         },
         prepareScroll() {
-          this.$.postsQuery.ref.once('value', () => {
+          this.$.fbPosts.ref.once('value', () => {
             this.async(this.scrollNicely.bind(this), 100)
           })
         },
@@ -124,8 +129,8 @@ dom-module#fire-chat
         submit() {
           const { postBody } = this
           if (!postBody) return
-          const query = this.$$('#postsQuery')
-          query.ref.push({ body: this.postBody, createdBy: this.myId, createdAt: firebase.database.ServerValue.TIMESTAMP })
+          const query = this.$$('#fbPosts')
+          query.ref.push({ body: this.postBody, createdBy: this.user.id, createdAt: firebase.database.ServerValue.TIMESTAMP })
           this.set('postBody', '')
         },
         onKeydown(event) {
@@ -135,30 +140,30 @@ dom-module#fire-chat
             this.submit()
           }
         },
-        user(id) {
-          return this.users[id]
+        userById(id) {
+          return this.users.find(it => it.id === id)
         },
         participate() {
-          const { participants, myId } = this
-          const query = this.$$('#participantsQuery')
+          const { participants, user: { id } } = this
+          const query = this.$$('#fbParticipations')
           const hasParticipated = participants.some(p => {
-            return p.userId === myId
+            return p.userId === id
           })
           if (hasParticipated) return
-          query.ref.push({ userId: this.myId })
+          query.ref.push({ userId: id })
         },
         unparticipate() {
-          const { participants, myId } = this
-          const query = this.$$('#participantsQuery')
+          const { participants, user: { id } } = this
+          const query = this.$$('#fbParticipations')
           participants.filter(p => {
-            return p.userId === myId
+            return p.userId === id
           }).forEach(p => {
             query.ref.child(p.$key).remove()
           })
         },
         participantsToUsers(participants, users) {
           if (!(participants && users)) return []
-          return participants.map(p => users[p.userId])
+          return participants.map(p => this.userById(p.userId))
         },
         updatePostsLimit({ target }) {
           if (target.scrollTop > 0) return
